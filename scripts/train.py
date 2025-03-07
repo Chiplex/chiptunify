@@ -47,17 +47,45 @@ def prepare_dataset(input_dir):
     # Para este ejemplo simplificado, solo tomamos hasta 5 archivos
     sample_limit = min(5, len(audio_files))
     audio_data = []
+    problemas_encontrados = []
     
     for file in tqdm(audio_files[:sample_limit], desc="Cargando audio"):
         file_path = os.path.join(input_dir, file)
         try:
             y, sr = librosa.load(file_path, sr=16000, mono=True)
+            
+            # Verificaciones de calidad
+            if len(y) < sr * 1.0:  # Audio menor a 1 segundo
+                problemas_encontrados.append(f"{file}: duración muy corta ({len(y)/sr:.2f}s)")
+                continue
+                
+            if np.mean(np.abs(y)) < 0.01:  # Audio muy silencioso
+                problemas_encontrados.append(f"{file}: audio muy silencioso, posible problema de grabación")
+                continue
+            
             # Tomar solo hasta 10 segundos para simplificar
             if len(y) > 10 * sr:
                 y = y[:10 * sr]
+                
+            # Verificar que podamos extraer características correctamente
+            try:
+                encoder = LightweightVoiceEncoder()
+                features = encoder.extract_features(y)
+                print(f"{file}: {features.shape[0]} frames, {features.shape[1]} características")
+            except Exception as e:
+                problemas_encontrados.append(f"{file}: error al extraer características: {e}")
+                continue
+                
             audio_data.append(y)
         except Exception as e:
             print(f"Error al cargar {file}: {e}")
+    
+    # Mostrar problemas encontrados
+    if problemas_encontrados:
+        print("\n--- ADVERTENCIAS DE ARCHIVOS DE AUDIO ---")
+        for problema in problemas_encontrados:
+            print(f"⚠️ {problema}")
+        print("------------------------------------\n")
     
     return audio_data
 

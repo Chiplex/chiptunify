@@ -90,6 +90,23 @@ def convert_audio(args):
     features = encoder.extract_features(y, sr)
     features_tensor = torch.FloatTensor(features).to(device)
     
+    # NUEVO: Verificar y normalizar longitudes de tensores
+    features_len = features_tensor.size(0)
+    midi_len = midi_notes.size(0)
+    
+    print(f"Longitud de características extraídas: {features_len} frames")
+    print(f"Longitud de notas MIDI: {midi_len} frames")
+    
+    # Normalizar longitudes para que coincidan
+    if features_len > midi_len:
+        print(f"Recortando características de audio para que coincidan con MIDI ({features_len} → {midi_len})")
+        features_tensor = features_tensor[:midi_len]
+    elif midi_len > features_len:
+        print(f"Recortando notas MIDI para que coincidan con audio ({midi_len} → {features_len})")
+        midi_notes = midi_notes[:features_len]
+    
+    print(f"Tensores normalizados a {features_tensor.size(0)} frames")
+    
     # Convertir audio a canto según las notas MIDI
     print("Convirtiendo audio a canto con estilo chiptune...")
     
@@ -97,10 +114,20 @@ def convert_audio(args):
     batch_size = 50
     outputs = []
     
+    # MODIFICADO: Procesamiento por lotes con verificación adicional
     for i in range(0, len(features_tensor), batch_size):
-        batch_features = features_tensor[i:i+batch_size]
-        batch_notes = midi_notes[i:i+batch_size].to(device)
+        end_idx = min(i + batch_size, len(features_tensor))
+        batch_features = features_tensor[i:end_idx]
+        batch_notes = midi_notes[i:end_idx].to(device)
         
+        # Verificación de seguridad adicional
+        if batch_features.size(0) != batch_notes.size(0):
+            print(f"⚠️ Advertencia: Tamaños de batch no coinciden en el índice {i}.")
+            min_size = min(batch_features.size(0), batch_notes.size(0))
+            batch_features = batch_features[:min_size]
+            batch_notes = batch_notes[:min_size]
+            print(f"   Ajustados a {min_size} elementos")
+            
         # Codificar
         with torch.no_grad():
             encoded = encoder(batch_features)

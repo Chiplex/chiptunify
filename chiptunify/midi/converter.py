@@ -86,6 +86,11 @@ class MIDIConverter:
         # Inicializar array con silencios (nota 0)
         note_frames = np.zeros(num_frames, dtype=np.int64)
         
+        # Si no hay notas, devolver array de silencios del tamaño correcto
+        if not notes:
+            print("⚠️ Advertencia: No se encontraron notas en el archivo MIDI.")
+            return note_frames
+            
         # Llenar array con notas
         for start_time, end_time, note, velocity in notes:
             start_frame = int(start_time * self.sr / self.hop_length)
